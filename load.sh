@@ -12,28 +12,27 @@ fi
 # get current macOS version
 OS_VERSION=$(sw_vers -productVersion)
 
-# 提取主版本号和次版本号（例如 13.1 -> 13）
+# get the major and minor version numbers（eg 13.1 -> 13）
 OS_MAJOR=$(echo "$OS_VERSION" | cut -d '.' -f 1)
 OS_MINOR=$(echo "$OS_VERSION" | cut -d '.' -f 2)
 echo "Detected macOS version: $OS_VERSION"
 
-
-echo "Checking if Turbo Boost already disabled..."
 # define which command to use
-results=0
+CHECK_CMD=""
+LOAD_CMD=""
 if [[ $OS_MAJOR -eq 10 && $OS_MINOR -lt 15 ]]; then
-    echo "Using kextstat to check the kernel extension."
-    results=`kextstat | grep -c com.rugarciap.DisableTurboBoost`
+    CHECK_CMD="kextstat"
+    LOAD_CMD="kextutil -v"
 elif [[ $OS_MAJOR -ge 10 && $OS_MINOR -ge 15 ]] || [[ $OS_MAJOR -gt 10 ]]; then
-    echo "Using kmutil to check the kernel extension."
-    results=`kmutil showloaded | grep -c com.rugarciap.DisableTurboBoost`
+    CHECK_CMD="kmutil showloaded"
+    LOAD_CMD="kmutil load --bundle-path"
 else
     echo "Unsupported macOS version: $OS_VERSION"
     exit 1
 fi
-if [ $results -gt 0 ]
-then
-    echo "Found kext com.rugarciap.DisableTurboBoost"
+
+echo "Using $CHECK_CMD to check if Turbo Boost already disabled..."
+if [[ $($CHECK_CMD | grep -c com.rugarciap.DisableTurboBoost) -gt 0 ]]; then
     echo "Turbo Boost already disabled!"
     exit 0
 fi
@@ -43,15 +42,8 @@ echo "Disabling TurboBoost now..."
 
 
 # define which command to use
-if [[ $OS_MAJOR -eq 10 && $OS_MINOR -lt 15 ]]; then
-    echo "Using kextutil to load the kernel extension."
-    sudo /usr/bin/kextutil -v "$KEXT_PATH"
-elif [[ $OS_MAJOR -ge 10 && $OS_MINOR -ge 15 ]] || [[ $OS_MAJOR -gt 10 ]]; then
-    echo "Using kmutil to load the kernel extension."
-    sudo /usr/bin/kmutil load --bundle-path "$KEXT_PATH"
-else
-    echo "Unsupported macOS version: $OS_VERSION"
-    exit 1
-fi
+echo "Using $LOAD_CMD to load the kernel extension."
+sudo $LOAD_CMD "$KEXT_PATH"
+
 echo "Turbo Boost disabled."
 
